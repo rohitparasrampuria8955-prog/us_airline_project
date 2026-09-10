@@ -1,0 +1,121 @@
+import boto3
+import zipfile
+from urllib.request import urlopen
+
+s3 = boto3.client("s3",region_name="ap-south-1")
+
+def bucket_exists(bucket_name):
+    buckets = s3.list_buckets()["Buckets"]
+    for bucket in buckets:
+        if bucket["Name"] == bucket_name:
+            return True
+    return False
+
+
+def create_bucket(bucket_name):
+    s3.create_bucket(
+        Bucket=bucket_name,
+        CreateBucketConfiguration={
+            "LocationConstraint": "ap-south-1"
+        }
+    )
+    print(f"{bucket_name} Bucket Created Successfully\n")
+
+
+def upload_file(bucket_name, file_path, folder_name):
+    file_name = file_path.split("/")[-1]
+    s3_key = f"{folder_name}/{file_name}"
+    s3.upload_file(
+        Filename=file_path,
+        Bucket=bucket_name,
+        Key=s3_key
+    )
+    print(f"{file_name} Uploaded Successfully")
+    print(f"S3 Location: {s3_key}\n")
+
+
+def extract_csv(zip_file):
+    with zipfile.ZipFile(zip_file, "r") as zip_ref:
+        files = zip_ref.namelist()
+        for file in files:
+            if file.lower().endswith(".csv"):
+                zip_ref.extract(file)
+                print(
+                    f"{file} Extracted Successfully"
+                )
+                return file
+    return None
+
+def download_file(month_count, bucket_name):
+    chunk_size = 1024 * 1024
+    year = 2025
+    for i in range(1, month_count + 1):
+        file_url = (
+            f"https://transtats.bts.gov/PREZIP/"
+            f"On_Time_Reporting_Carrier_On_Time_Performance_"
+            f"1987_present_{year}_{i}.zip"
+        )
+        zip_file_name = f"{year}_month_{i}.zip"
+        print(
+            f"\nDownloading : {zip_file_name}"
+        )
+        try:
+            response = urlopen(file_url)
+            with open(zip_file_name, "wb") as file:
+                while True:
+                    chunk = response.read(chunk_size)
+                    if not chunk:
+                        break
+                    file.write(chunk)
+            print(
+                f"{zip_file_name} "
+                f"Downloaded Successfully"
+            )
+
+            csv_file = extract_csv(
+                zip_file_name
+            )
+
+            if csv_file:
+
+                folder_name = "2025"
+
+                upload_file(
+                    bucket_name,
+                    csv_file,
+                    folder_name
+                )
+
+            else:
+
+                print(
+                    "CSV File Not Found"
+                )
+
+
+        except Exception as e:
+
+            print(
+                f"Error processing "
+                f"2025 month {i}: {e}"
+            )
+
+            continue
+
+
+def main():
+
+    bucket_name = "us-airline-project-20-08"
+    if bucket_exists(bucket_name):
+
+        print("Bucket Already Exists\n")
+    else:
+        create_bucket(bucket_name)
+
+    download_file(
+        12,
+        bucket_name
+    )
+
+
+main()
