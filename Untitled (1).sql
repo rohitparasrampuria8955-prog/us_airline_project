@@ -1,0 +1,489 @@
+create or replace database airline;
+create or replace schema airline.gold;
+
+
+
+show warehouses;
+USE WAREHOUSE COMPUTE_WH;
+SELECT CURRENT_WAREHOUSE();
+
+SHOW DATABASES;
+
+
+CREATE OR REPLACE TABLE airline.gold.FLIGHT_ANALYTICS (
+
+    Year VARCHAR,
+    Quarter VARCHAR,
+    Month VARCHAR,
+    DayofMonth VARCHAR,
+    DayOfWeek VARCHAR,
+    FlightDate VARCHAR,
+
+    Reporting_Airline VARCHAR,
+    DOT_ID_Reporting_Airline VARCHAR,
+    IATA_CODE_Reporting_Airline VARCHAR,
+    Tail_Number VARCHAR,
+    Flight_Number_Reporting_Airline VARCHAR,
+
+    OriginAirportID VARCHAR,
+    OriginAirportSeqID VARCHAR,
+    OriginCityMarketID VARCHAR,
+    Origin VARCHAR,
+    OriginCityName VARCHAR,
+    OriginState VARCHAR,
+    OriginStateFips VARCHAR,
+    OriginStateName VARCHAR,
+    OriginWac VARCHAR,
+
+    DestAirportID VARCHAR,
+    DestAirportSeqID VARCHAR,
+    DestCityMarketID VARCHAR,
+    Dest VARCHAR,
+    DestCityName VARCHAR,
+    DestState VARCHAR,
+    DestStateFips VARCHAR,
+    DestStateName VARCHAR,
+    DestWac VARCHAR,
+
+    CRSDepTime VARCHAR,
+    DepTime VARCHAR,
+    DepDelay VARCHAR,
+    DepDelayMinutes VARCHAR,
+    DepDel15 VARCHAR,
+    DepartureDelayGroups VARCHAR,
+    DepTimeBlk VARCHAR,
+
+    TaxiOut VARCHAR,
+    WheelsOff VARCHAR,
+    WheelsOn VARCHAR,
+    TaxiIn VARCHAR,
+
+    CRSArrTime VARCHAR,
+    ArrTime VARCHAR,
+    ArrDelay DOUBLE,
+    ArrDelayMinutes VARCHAR,
+    ArrDel15 VARCHAR,
+    ArrivalDelayGroups VARCHAR,
+    ArrTimeBlk VARCHAR,
+
+    Cancelled VARCHAR,
+    CancellationCode VARCHAR,
+    Diverted VARCHAR,
+
+    CRSElapsedTime VARCHAR,
+    ActualElapsedTime VARCHAR,
+    AirTime VARCHAR,
+    Flights VARCHAR,
+    Distance DOUBLE,
+    DistanceGroup VARCHAR,
+
+    CarrierDelay VARCHAR,
+    WeatherDelay VARCHAR,
+    NASDelay VARCHAR,
+    SecurityDelay VARCHAR,
+    LateAircraftDelay VARCHAR,
+
+    FirstDepTime VARCHAR,
+    TotalAddGTime VARCHAR,
+    LongestAddGTime VARCHAR,
+    DivAirportLandings VARCHAR,
+    DivReachedDest VARCHAR,
+    DivActualElapsedTime VARCHAR,
+    DivArrDelay VARCHAR,
+    DivDistance VARCHAR,
+
+    Div1Airport VARCHAR,
+    Div1AirportID VARCHAR,
+    Div1AirportSeqID VARCHAR,
+    Div1WheelsOn VARCHAR,
+    Div1TotalGTime VARCHAR,
+    Div1LongestGTime VARCHAR,
+    Div1WheelsOff VARCHAR,
+    Div1TailNum VARCHAR,
+
+    Div2Airport VARCHAR,
+    Div2AirportID VARCHAR,
+    Div2AirportSeqID VARCHAR,
+    Div2WheelsOn VARCHAR,
+    Div2TotalGTime VARCHAR,
+    Div2LongestGTime VARCHAR,
+    Div2WheelsOff VARCHAR,
+    Div2TailNum VARCHAR,
+
+    Div3Airport VARCHAR,
+    Div3AirportID VARCHAR,
+    Div3AirportSeqID VARCHAR,
+    Div3WheelsOn VARCHAR,
+    Div3TotalGTime VARCHAR,
+    Div3LongestGTime VARCHAR,
+    Div3WheelsOff VARCHAR,
+    Div3TailNum VARCHAR,
+
+    Div4Airport VARCHAR,
+    Div4AirportID VARCHAR,
+    Div4AirportSeqID VARCHAR,
+    Div4WheelsOn VARCHAR,
+    Div4TotalGTime VARCHAR,
+    Div4LongestGTime VARCHAR,
+    Div4WheelsOff VARCHAR,
+    Div4TailNum VARCHAR,
+
+    Div5Airport VARCHAR,
+    Div5AirportID VARCHAR,
+    Div5AirportSeqID VARCHAR,
+    Div5WheelsOn VARCHAR,
+    Div5TotalGTime VARCHAR,
+    Div5LongestGTime VARCHAR,
+    Div5WheelsOff VARCHAR,
+    Div5TailNum VARCHAR,
+
+    _c109 VARCHAR,
+
+    total_flag INTEGER,
+    cleaned INTEGER,
+    row_no INTEGER,
+
+    crs_dep_time_std VARCHAR,
+    crs_arr_time_std VARCHAR,
+
+    CRSDepTime_minuts BIGINT,
+    CRSArrTime_minuts BIGINT,
+
+    is_cancelled BOOLEAN,
+    is_diverted BOOLEAN,
+    is_departure_delayed BOOLEAN,
+    is_arrival_delayed BOOLEAN,
+
+    arrival_catagory VARCHAR,
+
+    origin_iata VARCHAR,
+    origin_latitude VARCHAR,
+    origin_longitude VARCHAR,
+    origin_airport_dataquality INTEGER,
+
+    destination_iata VARCHAR,
+    destination_latitude VARCHAR,
+    destination_longitude VARCHAR,
+    destination_airport_dataquality INTEGER,
+
+    calculeted_distance DOUBLE,
+    distance_difference_percentage DOUBLE
+);
+
+select * from airline.gold.flight_analytics;
+select origin ,origin_iata from gold.flight_analytics;
+
+
+
+
+
+-- create first kpi table base on arline data
+create or replace table  airline.gold.airline_monthly_detail as 
+SELECT
+    YEAR,
+    MONTH,
+    REPORTING_AIRLINE,
+    count(*) AS TOTAL_FLIGHTS,
+    SUM(CASE
+            WHEN IS_CANCELLED = TRUE THEN 1
+            ELSE 0
+        END) AS TOTAL_CANCELLED,
+    SUM(CASE
+            WHEN IS_DIVERTED = TRUE THEN 1
+            ELSE 0
+        END) AS TOTAL_DIVERTED,
+    SUM(CASE
+            WHEN IS_DEPARTURE_DELAYED = TRUE THEN 1
+            ELSE 0
+        END) AS TOTAL_DEPARTURE_DELAYED,
+
+    SUM(CASE
+            WHEN IS_ARRIVAL_DELAYED = TRUE THEN 1
+            ELSE 0
+        END) AS TOTAL_ARRIVAL_DELAYED,
+
+    SUM(CASE
+            WHEN IS_CANCELLED = FALSE
+                 AND IS_ARRIVAL_DELAYED = TRUE
+            THEN 1
+            ELSE 0
+        END) AS DELAYED_NON_CANCELLED,
+
+    SUM(CASE
+            WHEN IS_CANCELLED = FALSE
+                 AND IS_ARRIVAL_DELAYED = FALSE
+            THEN 1
+            ELSE 0
+        END) AS ON_TIME_FLIGHTS,
+
+    APPROX_PERCENTILE(
+        CASE
+            WHEN IS_CANCELLED = FALSE
+            THEN ARRDELAY
+        END,
+        0.50
+    ) AS ARRIVAL_DELAY_MEDIAN
+
+FROM gold.flight_analytics
+
+GROUP BY
+    YEAR,
+    MONTH,
+    REPORTING_AIRLINE
+ORDER BY YEAR, MONTH;
+
+    
+create or replace table airline.gold.airline_monthly_detail as
+    SELECT
+        *,
+        
+        ROUND(
+            TOTAL_CANCELLED / NULLIF(TOTAL_FLIGHTS, 0) * 100,
+            2
+        ) AS CANCELLED_PCT,
+    
+        ROUND(
+            DELAYED_NON_CANCELLED
+            / NULLIF(TOTAL_FLIGHTS - TOTAL_CANCELLED, 0) * 100,
+            2
+        ) AS DELAYED_NON_CANCELLED_PCT,
+    
+        ROUND(
+            ON_TIME_FLIGHTS
+            / NULLIF(TOTAL_FLIGHTS - TOTAL_CANCELLED, 0) * 100,
+            2
+        ) AS ON_TIME_PCT
+
+FROM airline.gold.airline_monthly_detail ORDER BY YEAR, MONTH;
+
+
+
+-- rought base monthly details
+CREATE OR REPLACE TABLE AIRLINE.GOLD.ROUGHT_MONTHLY_DETAIL AS
+SELECT
+    YEAR,
+    MONTH,
+    ORIGIN,
+    ORIGINCITYNAME,
+    DEST,
+    COUNT(TOTAL_FLAG) AS TOTAL_FLIGHTS,
+    ROUND(AVG(CASE WHEN IS_CANCELLED = FALSE THEN ARRDELAY END), 2) AS AVG_DELAY,
+    ROUND(AVG(DISTANCE), 2) AS AVG_DISTANCE,
+    SUM(CASE WHEN IS_CANCELLED = FALSE AND IS_ARRIVAL_DELAYED = TRUE THEN 1 ELSE 0 END) AS TOTAL_ARRIVAL_DELAYED,
+    SUM(CASE WHEN IS_CANCELLED = FALSE AND IS_ARRIVAL_DELAYED = FALSE THEN 1 ELSE 0 END) AS ON_TIME_FLIGHTS,
+    COUNT(DISTINCT IATA_CODE_REPORTING_AIRLINE) AS UNIQUE_AIRLINE_CODE,
+    ROUND(
+        SUM(CASE WHEN IS_CANCELLED = FALSE AND IS_ARRIVAL_DELAYED = FALSE THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS ON_TIME_PCT
+FROM AIRLINE.GOLD.FLIGHT_ANALYTICS
+GROUP BY
+    YEAR,
+    MONTH,
+    ORIGIN,
+    ORIGINCITYNAME,
+    DEST;
+
+    
+SELECT * FROM AIRLINE.GOLD.ROUGHT_MONTHLY_DETAIL;
+
+
+
+CREATE OR REPLACE TABLE AIRLINE.GOLD.AIRPORT_MONTHLY_DETAILS AS
+SELECT
+    YEAR,
+    MONTH,
+    ORIGIN,
+    ORIGINCITYNAME,
+    COUNT(TOTAL_FLAG) AS TOTAL_FLIGHTS,
+    SUM(CASE WHEN IS_CANCELLED = TRUE THEN 1 ELSE 0 END) AS TOTAL_CANCELLED,
+    SUM(CASE WHEN IS_DIVERTED = TRUE THEN 1 ELSE 0 END) AS TOTAL_DIVERTED,
+    SUM(CASE WHEN IS_DEPARTURE_DELAYED = TRUE THEN 1 ELSE 0 END) AS TOTAL_DEPARTURE_DELAYED,
+    SUM(CASE WHEN IS_ARRIVAL_DELAYED = TRUE THEN 1 ELSE 0 END) AS TOTAL_ARRIVAL_DELAYED,
+    SUM(CASE
+        WHEN IS_CANCELLED = FALSE AND IS_ARRIVAL_DELAYED = TRUE
+        THEN 1 ELSE 0
+    END) AS DELAYED_NOT_CANCELLED,
+
+    SUM(CASE
+        WHEN IS_CANCELLED = FALSE AND IS_ARRIVAL_DELAYED = FALSE
+        THEN 1 ELSE 0
+    END) AS ON_TIME_FLIGHTS,
+
+    APPROX_PERCENTILE(
+        CASE WHEN IS_CANCELLED = FALSE THEN ARRDELAY END, 0.50
+    ) AS ARRIVAL_DELAY_MEDIAN,
+
+    ROUND(
+        SUM(CASE WHEN IS_CANCELLED = TRUE THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS CANCELLED_PCT,
+
+    ROUND(
+        SUM(CASE
+            WHEN IS_CANCELLED = FALSE AND IS_ARRIVAL_DELAYED = TRUE
+            THEN 1 ELSE 0
+        END)
+        / NULLIF(
+            COUNT(TOTAL_FLAG) - SUM(CASE WHEN IS_CANCELLED = TRUE THEN 1 ELSE 0 END), 0
+        ) * 100, 2
+    ) AS DELAYED_NOT_CANCELLED_PCT,
+
+    ROUND(
+        SUM(CASE
+            WHEN IS_CANCELLED = FALSE AND IS_ARRIVAL_DELAYED = FALSE
+            THEN 1 ELSE 0
+        END)
+        / NULLIF(
+            COUNT(TOTAL_FLAG) - SUM(CASE WHEN IS_CANCELLED = TRUE THEN 1 ELSE 0 END), 0
+        ) * 100, 2
+    ) AS ON_TIME_PCT,
+
+    ROUND(
+        SUM(CASE WHEN IS_DIVERTED = TRUE THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS DIVERTED_PCT,
+
+    ROUND(
+        SUM(CASE WHEN IS_DEPARTURE_DELAYED = TRUE THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS DEPARTURE_DELAYED_PCT,
+
+    ROUND(
+        SUM(CASE WHEN IS_ARRIVAL_DELAYED = TRUE THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS ARRIVAL_DELAYED_PCT
+
+FROM AIRLINE.GOLD.FLIGHT_ANALYTICS
+
+GROUP BY
+    YEAR,
+    MONTH,
+    ORIGIN,
+    ORIGINCITYNAME;
+    
+
+
+
+
+-- DALAY_REGION_WITH_PCT
+CREATE OR REPLACE TABLE AIRLINE.GOLD.DELAY_CAUSE AS
+SELECT
+    YEAR,
+    MONTH,
+    ORIGIN,
+    ORIGINCITYNAME,
+    COUNT(TOTAL_FLAG) AS TOTAL_FLIGHTS,
+    SUM(CASE WHEN IS_CANCELLED = TRUE THEN 1 ELSE 0 END) AS TOTAL_CANCELLED,
+    SUM(CASE WHEN IS_DIVERTED = TRUE THEN 1 ELSE 0 END) AS TOTAL_DIVERTED,
+    SUM(CASE WHEN IS_DEPARTURE_DELAYED = TRUE THEN 1 ELSE 0 END) AS TOTAL_DEPARTURE_DELAYED,
+    SUM(CASE WHEN IS_ARRIVAL_DELAYED = TRUE THEN 1 ELSE 0 END) AS TOTAL_ARRIVAL_DELAYED,
+    SUM(CASE
+        WHEN IS_CANCELLED = FALSE AND IS_ARRIVAL_DELAYED = TRUE
+        THEN 1 ELSE 0
+    END) AS DELAYED_NOT_CANCELLED,
+    SUM(CASE
+        WHEN IS_CANCELLED = FALSE AND IS_ARRIVAL_DELAYED = FALSE
+        THEN 1 ELSE 0
+    END) AS ON_TIME_FLIGHTS,
+    SUM(CARRIERDELAY) AS CARRIER_DELAY_MINUTES,
+    SUM(WEATHERDELAY) AS WEATHER_DELAY_MINUTES,
+    SUM(NASDELAY) AS NAS_DELAY_MINUTES,
+    SUM(SECURITYDELAY) AS SECURITY_DELAY_MINUTES,
+    SUM(LATEAIRCRAFTDELAY) AS LATE_AIRCRAFT_DELAY_MINUTES,
+    ROUND(
+        SUM(CASE WHEN IS_CANCELLED = TRUE THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS CANCELLED_PCT,
+
+    ROUND(
+        SUM(CASE
+            WHEN IS_CANCELLED = FALSE AND IS_ARRIVAL_DELAYED = TRUE
+            THEN 1 ELSE 0
+        END)
+        / NULLIF(
+            COUNT(TOTAL_FLAG) -
+            SUM(CASE WHEN IS_CANCELLED = TRUE THEN 1 ELSE 0 END), 0
+        ) * 100, 2
+    ) AS DELAYED_NON_CANCELLED_PCT,
+
+    ROUND(
+        SUM(CASE
+            WHEN IS_CANCELLED = FALSE AND IS_ARRIVAL_DELAYED = FALSE
+            THEN 1 ELSE 0
+        END)
+        / NULLIF(
+            COUNT(TOTAL_FLAG) -
+            SUM(CASE WHEN IS_CANCELLED = TRUE THEN 1 ELSE 0 END), 0
+        ) * 100, 2
+    ) AS ON_TIME_PCT,
+
+    ROUND(
+        SUM(CASE WHEN IS_DIVERTED = TRUE THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS DIVERTED_PCT,
+
+    ROUND(
+        SUM(CASE WHEN IS_DEPARTURE_DELAYED = TRUE THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS DEPARTURE_DELAYED_PCT,
+
+    ROUND(
+        SUM(CASE WHEN IS_ARRIVAL_DELAYED = TRUE THEN 1 ELSE 0 END)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS ARRIVAL_DELAYED_PCT,
+
+    ROUND(
+        SUM(CARRIERDELAY)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS CARRIER_DELAY_PCT,
+
+    ROUND(
+        SUM(WEATHERDELAY)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS WEATHER_DELAY_PCT,
+
+    ROUND(
+        SUM(NASDELAY)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS NAS_DELAY_PCT,
+
+    ROUND(
+        SUM(SECURITYDELAY)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS SECURITY_DELAY_PCT,
+
+    ROUND(
+        SUM(LATEAIRCRAFTDELAY)
+        / NULLIF(COUNT(TOTAL_FLAG), 0) * 100, 2
+    ) AS LATE_AIRCRAFT_DELAY_PCT
+
+FROM AIRLINE.GOLD.FLIGHT_ANALYTICS
+
+GROUP BY
+    YEAR,
+    MONTH,
+    ORIGIN,
+    ORIGINCITYNAME;
+
+
+
+SELECT * FROM AIRLINE.GOLD.DELAY_CAUSE;
+
+SELECT * FROM AIRLINE.GOLD.FLIGHT_ANALYTICS;
+
+
+SELECT * FROM AIRLINE.GOLD.AIRLINE_MONTHLY_DETAIL LIMIT 20;
+SELECT * FROM AIRLINE.GOLD.AIRPORT_MONTHLY_DETAILS LIMIT 20;
+SELECT * FROM AIRLINE.GOLD.DELAY_CAUSE LIMIT 20;
+SELECT * FROM AIRLINE.GOLD.ROUGHT_MONTHLY_DETAIL LIMIT 20;
+
+    
+    
+
+
+
+
+
+
+
